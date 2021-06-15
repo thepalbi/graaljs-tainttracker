@@ -120,6 +120,11 @@
       <artifactId>truffle-dsl-processor</artifactId>
       <version>${graalvm.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.graalvm.js</groupId>
+      <artifactId>js</artifactId>
+      <version>${graalvm.version}</version>
+    </dependency>
   </dependencies>
   <build>
     <plugins>

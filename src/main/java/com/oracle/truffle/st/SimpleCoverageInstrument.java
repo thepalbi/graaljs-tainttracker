@@ -41,16 +41,16 @@
 package com.oracle.truffle.st;
 
 import java.io.PrintStream;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.*;
 import com.oracle.truffle.api.instrumentation.StandardTags.CallTag;
+import com.oracle.truffle.js.nodes.function.JSFunctionCallNode;
+import com.oracle.truffle.js.nodes.instrumentation.JSTags;
+import com.oracle.truffle.js.runtime.JavaScriptFunctionCallNode;
 import org.graalvm.options.OptionCategory;
 import org.graalvm.options.OptionDescriptors;
 import org.graalvm.options.OptionKey;
@@ -106,8 +106,14 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
      */
     final Map<Source, Coverage> coverageMap = new HashMap<>();
 
+    final Set<String> collectedRequires = new HashSet<>();
+
     public synchronized Map<Source, Coverage> getCoverageMap() {
         return Collections.unmodifiableMap(coverageMap);
+    }
+
+    public synchronized Set<String> getCollectedRequires() {
+        return Collections.unmodifiableSet(collectedRequires);
     }
 
     /**
@@ -169,7 +175,8 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
      */
     private void enable(final Env env) {
         SourceSectionFilter filter = SourceSectionFilter.newBuilder().tagIs(ExpressionTag.class).includeInternal(false).build();
-        SourceSectionFilter callsFilter = SourceSectionFilter.newBuilder().tagIs(CallTag.class).includeInternal(false).build();
+        SourceSectionFilter callsFilter = SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build();
+        SourceSectionFilter inputFilter = SourceSectionFilter.newBuilder().tagIs(StandardTags.ExpressionTag.class, JSTags.InputNodeTag.class).build();
         Instrumenter instrumenter = env.getInstrumenter();
         instrumenter.attachLoadSourceSectionListener(filter, new GatherSourceSectionsListener(this), true);
         instrumenter.attachExecutionEventFactory(filter, new CoverageEventFactory(this));
@@ -188,6 +195,12 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
                 return 42;
             }
         });
+        instrumenter.attachExecutionEventFactory(
+                callsFilter,
+                inputFilter,
+                context -> {
+                    return new CallCapturerNode(SimpleCoverageInstrument.this, context.getInstrumentedSourceSection());
+                });
     }
 
     /**
@@ -228,6 +241,11 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
         for (int i = 1; i <= source.getLineCount(); i++) {
             char covered = getCoverageCharacter(nonCoveredLineNumbers, loadedLineNumbers, i);
             printStream.println(String.format("%s %s", covered, source.getCharacters(i)));
+        }
+        printStream.println("==");
+        printStream.println("Listing all collected requires:");
+        for (String collectedRequire : collectedRequires) {
+            printStream.println(collectedRequire);
         }
     }
 
@@ -287,6 +305,10 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
     synchronized void addCovered(SourceSection sourceSection) {
         final Coverage coverage = coverageMap.get(sourceSection.getSource());
         coverage.addCovered(sourceSection);
+    }
+
+    synchronized void addRequire(String requireString) {
+        collectedRequires.add(requireString);
     }
 
 }
