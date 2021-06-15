@@ -5,6 +5,7 @@ import java.util.Objects;
 public class RequireQuery {
     private final String path;
     private final String query;
+    private final boolean isEntryPoint;
 
     @Override
     public boolean equals(Object o) {
@@ -19,9 +20,10 @@ public class RequireQuery {
         return Objects.hash(path, query);
     }
 
-    public RequireQuery(String path, String query) {
+    public RequireQuery(String path, String query, boolean isEntryPoint) {
         this.path = path;
         this.query = query;
+        this.isEntryPoint = isEntryPoint;
     }
 
     public String getPath() {
@@ -33,4 +35,7 @@ public class RequireQuery {
     }
 
 
+    public boolean isEntryPoint() {
+        return isEntryPoint;
+    }
 }

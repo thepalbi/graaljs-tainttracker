@@ -42,21 +42,14 @@ package com.oracle.truffle.st;
 
 import java.io.File;
 import java.io.PrintStream;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.FieldPosition;
 import java.util.*;
 import java.util.function.Function;
 
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.*;
-import com.oracle.truffle.api.instrumentation.StandardTags.CallTag;
-import com.oracle.truffle.api.interop.InteropLibrary;
-import com.oracle.truffle.js.nodes.function.JSFunctionCallNode;
 import com.oracle.truffle.js.nodes.instrumentation.JSTags;
-import com.oracle.truffle.js.runtime.ExitExceptionGen;
-import com.oracle.truffle.js.runtime.JavaScriptFunctionCallNode;
 import org.graalvm.options.OptionCategory;
 import org.graalvm.options.OptionDescriptors;
 import org.graalvm.options.OptionKey;
@@ -120,6 +113,18 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
     final Map<Source, Coverage> coverageMap = new HashMap<>();
 
     final Set<RequireQuery> collectedRequires = new HashSet<>();
+
+    final Map<Object, CounterWithNote> seenTimes = new HashMap<>();
+
+    class CounterWithNote {
+        String note;
+        Integer count;
+
+        public CounterWithNote(String note) {
+            this.note = note;
+            count = 0;
+        }
+    }
 
     public synchronized Map<Source, Coverage> getCoverageMap() {
         return Collections.unmodifiableMap(coverageMap);
@@ -187,9 +192,14 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
      * @param env The environment, used to get the {@link Instrumenter}
      */
     private void enable(final Env env) {
+        SourceSectionFilter properyReadFilter = SourceSectionFilter.newBuilder().tagIs(JSTags.ReadPropertyTag.class).build();
         SourceSectionFilter callsFilter = SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build();
         SourceSectionFilter inputFilter = SourceSectionFilter.newBuilder().tagIs(StandardTags.ExpressionTag.class, JSTags.InputNodeTag.class).build();
         Instrumenter instrumenter = env.getInstrumenter();
+        instrumenter.attachExecutionEventFactory(
+                properyReadFilter,
+                inputFilter,
+                ctx -> new PropertyReadNode(this, ctx));
         instrumenter.attachExecutionEventFactory(
                 callsFilter,
                 inputFilter,
@@ -220,9 +230,13 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
                                             // Must be a relative require
                                             File pathFile = new File(path);
                                             String absoluteRequirePath = Paths.get(pathFile.getParent(), requireString).toString();
-                                            SimpleCoverageInstrument.this.addRequire("", absoluteRequirePath);
+                                            boolean isEntryPoint = absoluteRequirePath.startsWith(LIBRARY_ROOT_DIR.getValue(env.getOptions())) && !absoluteRequirePath.contains("node_modules");
+                                            SimpleCoverageInstrument.this.addRequire("", absoluteRequirePath, isEntryPoint);
+                                            // Add result object as seen
+                                            SimpleCoverageInstrument.this.addAsSeen(result,
+                                                    String.format("result of require(\"%s\")", absoluteRequirePath), true);
                                         } else {
-                                            SimpleCoverageInstrument.this.addRequire(path, requireString);
+                                            SimpleCoverageInstrument.this.addRequire(path, requireString, false);
                                         }
                                     }
                                     // Since it's a require("") call
@@ -265,12 +279,15 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
         printStream.println("Listing all collected requires:");
         for (RequireQuery collectedRequire : collectedRequires) {
             printStream.printf("isEntryPoints: %s - called on %s, require(\"%s\")\n",
-                    collectedRequire.getQuery().startsWith(LIBRARY_ROOT_DIR.getValue(env.getOptions())) && !collectedRequire.getQuery().contains("node_modules"),
+                    collectedRequire.isEntryPoint(),
                     collectedRequire.getPath(),
                     collectedRequire.getQuery());
         }
-        for (Source source : coverageMap.keySet()) {
-            printResult(printStream, source);
+        printStream.println("==");
+        printStream.println("Seen objects:");
+        for (Object key : seenTimes.keySet()) {
+            CounterWithNote seenThing = seenTimes.get(key);
+            printStream.printf("%s seen %d times\n", seenThing.note, seenThing.count);
         }
     }
 
@@ -346,7 +363,18 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
         coverage.addCovered(sourceSection);
     }
 
-    synchronized void addRequire(String path, String query) {
-        collectedRequires.add(new RequireQuery(path, query));
+    synchronized void addRequire(String path, String query, boolean isEntryPoint) {
+        collectedRequires.add(new RequireQuery(path, query, isEntryPoint));
+    }
+
+    synchronized void addAsSeen(Object obj, String note, boolean createOk) {
+        CounterWithNote notedCounter = seenTimes.get(obj);
+        if (notedCounter == null && !createOk) {
+            return;
+        }
+        if (notedCounter == null) notedCounter = new CounterWithNote(note);
+
+        notedCounter.count++;
+        seenTimes.put(obj, notedCounter);
     }
 }
