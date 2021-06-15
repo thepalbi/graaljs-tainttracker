@@ -102,6 +102,13 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
      */
     @Option(name = "PrintCoverage", help = "Print coverage to stdout on process exit (default: true).", category = OptionCategory.USER, stability = OptionStability.STABLE)
     static final OptionKey<Boolean> PRINT_COVERAGE = new OptionKey<>(true);
+
+    // @formatter:off
+    /**
+     * Look at {@link #onCreate(Env)} and {@link #getOptionDescriptors()} for more info.
+     */
+    @Option(name = "LibraryRootDir", help = "Library root dir to consider requires as entry points (defaults to spawn).", category = OptionCategory.USER, stability = OptionStability.STABLE)
+    static final OptionKey<String> LIBRARY_ROOT_DIR = new OptionKey<>("/Users/pabbalbi/tesis/slim-taser/test_libs/spawn");
     // @formatter:on
 
     public static final String ID = "simple-code-coverage";
@@ -247,7 +254,7 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
     /**
      * Print the coverage results for each source.
      * <p>
-     * The printing is one the the {@link Env#out output stream} specified by the {@link Env
+     * The printing is one the the output stream specified by the {@link Env
      * enviroment}.
      *
      * @param env
@@ -257,7 +264,10 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
         printStream.println("==");
         printStream.println("Listing all collected requires:");
         for (RequireQuery collectedRequire : collectedRequires) {
-            printStream.printf("called on %s, require(\"%s\")\n", collectedRequire.getPath(), collectedRequire.getQuery());
+            printStream.printf("isEntryPoints: %s - called on %s, require(\"%s\")\n",
+                    collectedRequire.getQuery().startsWith(LIBRARY_ROOT_DIR.getValue(env.getOptions())) && !collectedRequire.getQuery().contains("node_modules"),
+                    collectedRequire.getPath(),
+                    collectedRequire.getQuery());
         }
         for (Source source : coverageMap.keySet()) {
             printResult(printStream, source);
