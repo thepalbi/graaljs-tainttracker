@@ -40,7 +40,11 @@
  */
 package com.oracle.truffle.st;
 
+import java.io.File;
 import java.io.PrintStream;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.FieldPosition;
 import java.util.*;
 import java.util.function.Function;
 
@@ -48,8 +52,10 @@ import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.*;
 import com.oracle.truffle.api.instrumentation.StandardTags.CallTag;
+import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.js.nodes.function.JSFunctionCallNode;
 import com.oracle.truffle.js.nodes.instrumentation.JSTags;
+import com.oracle.truffle.js.runtime.ExitExceptionGen;
 import com.oracle.truffle.js.runtime.JavaScriptFunctionCallNode;
 import org.graalvm.options.OptionCategory;
 import org.graalvm.options.OptionDescriptors;
@@ -106,13 +112,13 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
      */
     final Map<Source, Coverage> coverageMap = new HashMap<>();
 
-    final Set<String> collectedRequires = new HashSet<>();
+    final Set<RequireQuery> collectedRequires = new HashSet<>();
 
     public synchronized Map<Source, Coverage> getCoverageMap() {
         return Collections.unmodifiableMap(coverageMap);
     }
 
-    public synchronized Set<String> getCollectedRequires() {
+    public synchronized Set<RequireQuery> getCollectedRequires() {
         return Collections.unmodifiableSet(collectedRequires);
     }
 
@@ -174,32 +180,55 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
      * @param env The environment, used to get the {@link Instrumenter}
      */
     private void enable(final Env env) {
-        SourceSectionFilter filter = SourceSectionFilter.newBuilder().tagIs(ExpressionTag.class).includeInternal(false).build();
         SourceSectionFilter callsFilter = SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build();
         SourceSectionFilter inputFilter = SourceSectionFilter.newBuilder().tagIs(StandardTags.ExpressionTag.class, JSTags.InputNodeTag.class).build();
         Instrumenter instrumenter = env.getInstrumenter();
-        instrumenter.attachLoadSourceSectionListener(filter, new GatherSourceSectionsListener(this), true);
-        instrumenter.attachExecutionEventFactory(filter, new CoverageEventFactory(this));
-        instrumenter.attachExecutionEventFactory(callsFilter, context -> new ExecutionEventNode() {
-            @Override
-            protected void onReturnValue(VirtualFrame frame, Object result) {
-                String callSrc = context.getInstrumentedSourceSection().getCharacters().toString();
-                if ("overrideMe()".equals(callSrc)) {
-                    CompilerDirectives.transferToInterpreter();
-                    throw context.createUnwind(null);
-                }
-            }
-
-            @Override
-            protected Object onUnwind(VirtualFrame frame, Object info) {
-                return 42;
-            }
-        });
         instrumenter.attachExecutionEventFactory(
                 callsFilter,
                 inputFilter,
-                context -> {
-                    return new CallCapturerNode(SimpleCoverageInstrument.this, context.getInstrumentedSourceSection());
+                new ExecutionEventNodeFactory() {
+                    @Override
+                    public ExecutionEventNode create(EventContext context) {
+                        boolean doIsRequireCall = context.getInstrumentedSourceSection().getCharacters().toString().startsWith("require(");
+                        String pathToSource = context.getInstrumentedSourceSection().getSource().getPath();
+                        return new ExecutionEventNode() {
+                            @CompilerDirectives.CompilationFinal
+                            private boolean isRequireCall = doIsRequireCall;
+                            private final String path = pathToSource;
+
+                            @Override
+                            protected void onInputValue(VirtualFrame frame, EventContext inputContext, int inputIndex, Object inputValue) {
+                                if (isRequireCall) {
+                                    saveInputValue(frame, inputIndex, inputValue);
+                                }
+                            }
+
+                            @Override
+                            protected void onReturnValue(VirtualFrame frame, Object result) {
+                                if (isRequireCall) {
+                                    Object[] inputValues = getSavedInputValues(frame);
+                                    if (inputValues.length == 3 && inputValues[2] instanceof String) {
+                                        String requireString = (String) inputValues[2];
+                                        if (requireString.startsWith(".")) {
+                                            // Must be a relative require
+                                            File pathFile = new File(path);
+                                            String absoluteRequirePath = Paths.get(pathFile.getParent(), requireString).toString();
+                                            SimpleCoverageInstrument.this.addRequire("", absoluteRequirePath);
+                                        } else {
+                                            SimpleCoverageInstrument.this.addRequire(path, requireString);
+                                        }
+                                    }
+                                    // Since it's a require("") call
+//                                    if (inputValues.length != 3) {
+//                                        System.out.printf("Found require inputValues with: %d lastElement[%s]\n", inputValues.length,
+//                                                inputValues.length > 0 ? inputValues[inputValues.length - 1].toString() : "EMPTY");
+//
+//                                        return;
+//                                    }
+                                }
+                            }
+                        };
+                    }
                 });
     }
 
@@ -225,6 +254,11 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
      */
     private synchronized void printResults(final Env env) {
         final PrintStream printStream = new PrintStream(env.out());
+        printStream.println("==");
+        printStream.println("Listing all collected requires:");
+        for (RequireQuery collectedRequire : collectedRequires) {
+            printStream.printf("called on %s, require(\"%s\")\n", collectedRequire.getPath(), collectedRequire.getQuery());
+        }
         for (Source source : coverageMap.keySet()) {
             printResult(printStream, source);
         }
@@ -241,11 +275,6 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
         for (int i = 1; i <= source.getLineCount(); i++) {
             char covered = getCoverageCharacter(nonCoveredLineNumbers, loadedLineNumbers, i);
             printStream.println(String.format("%s %s", covered, source.getCharacters(i)));
-        }
-        printStream.println("==");
-        printStream.println("Listing all collected requires:");
-        for (String collectedRequire : collectedRequires) {
-            printStream.println(collectedRequire);
         }
     }
 
@@ -307,8 +336,7 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
         coverage.addCovered(sourceSection);
     }
 
-    synchronized void addRequire(String requireString) {
-        collectedRequires.add(requireString);
+    synchronized void addRequire(String path, String query) {
+        collectedRequires.add(new RequireQuery(path, query));
     }
-
 }
