@@ -50,6 +50,8 @@ import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.*;
 import com.oracle.truffle.js.nodes.instrumentation.JSTags;
+import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
+import com.oracle.truffle.js.runtime.objects.JSDynamicObject;
 import org.graalvm.options.OptionCategory;
 import org.graalvm.options.OptionDescriptors;
 import org.graalvm.options.OptionKey;
@@ -192,65 +194,42 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
      * @param env The environment, used to get the {@link Instrumenter}
      */
     private void enable(final Env env) {
-        SourceSectionFilter properyReadFilter = SourceSectionFilter.newBuilder().tagIs(JSTags.ReadPropertyTag.class).build();
+        SourceSectionFilter propertyReadFilter = SourceSectionFilter.newBuilder().tagIs(JSTags.ReadPropertyTag.class).build();
         SourceSectionFilter callsFilter = SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build();
         SourceSectionFilter inputFilter = SourceSectionFilter.newBuilder().tagIs(StandardTags.ExpressionTag.class, JSTags.InputNodeTag.class).build();
         Instrumenter instrumenter = env.getInstrumenter();
+
         instrumenter.attachExecutionEventFactory(
-                properyReadFilter,
+                SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
                 inputFilter,
-                ctx -> new PropertyReadNode(this, ctx));
-        instrumenter.attachExecutionEventFactory(
-                callsFilter,
-                inputFilter,
-                new ExecutionEventNodeFactory() {
+                ctx -> new FunctionCallPropagator() {
+                    @CompilerDirectives.CompilationFinal
+                    boolean isRequire =
+                            ctx.getInstrumentedSourceSection().getCharacters().toString().startsWith("require");
+
                     @Override
-                    public ExecutionEventNode create(EventContext context) {
-                        boolean doIsRequireCall = context.getInstrumentedSourceSection().getCharacters().toString().startsWith("require(");
-                        String pathToSource = context.getInstrumentedSourceSection().getSource().getPath();
-                        return new ExecutionEventNode() {
-                            @CompilerDirectives.CompilationFinal
-                            private boolean isRequireCall = doIsRequireCall;
-                            private final String path = pathToSource;
-
-                            @Override
-                            protected void onInputValue(VirtualFrame frame, EventContext inputContext, int inputIndex, Object inputValue) {
-                                if (isRequireCall) {
-                                    saveInputValue(frame, inputIndex, inputValue);
-                                }
-                            }
-
-                            @Override
-                            protected void onReturnValue(VirtualFrame frame, Object result) {
-                                if (isRequireCall) {
-                                    Object[] inputValues = getSavedInputValues(frame);
-                                    if (inputValues.length == 3 && inputValues[2] instanceof String) {
-                                        String requireString = (String) inputValues[2];
-                                        if (requireString.startsWith(".")) {
-                                            // Must be a relative require
-                                            File pathFile = new File(path);
-                                            String absoluteRequirePath = Paths.get(pathFile.getParent(), requireString).toString();
-                                            boolean isEntryPoint = absoluteRequirePath.startsWith(LIBRARY_ROOT_DIR.getValue(env.getOptions())) && !absoluteRequirePath.contains("node_modules");
-                                            SimpleCoverageInstrument.this.addRequire("", absoluteRequirePath, isEntryPoint);
-                                            // Add result object as seen
-                                            SimpleCoverageInstrument.this.addAsSeen(result,
-                                                    String.format("result of require(\"%s\")", absoluteRequirePath), true);
-                                        } else {
-                                            SimpleCoverageInstrument.this.addRequire(path, requireString, false);
-                                        }
-                                    }
-                                    // Since it's a require("") call
-//                                    if (inputValues.length != 3) {
-//                                        System.out.printf("Found require inputValues with: %d lastElement[%s]\n", inputValues.length,
-//                                                inputValues.length > 0 ? inputValues[inputValues.length - 1].toString() : "EMPTY");
-//
-//                                        return;
-//                                    }
-                                }
-                            }
-                        };
+                    protected void afterCall(Object receiver, JSFunctionObject function, Object[] arguments, Object result) {
+                        if (isRequire) {
+                            assert arguments[0] instanceof String;
+                            System.out.printf("%s, %s, %s\n",
+                                    ctx.getInstrumentedSourceSection().getSource().getPath(),
+                                    arguments[0],
+                                    result.getClass().getName());
+                        }
                     }
                 });
+//        instrumenter.attachExecutionEventFactory(
+//                properyReadFilter,
+//                inputFilter,
+//                ctx -> new PropertyReadNode(this, ctx));
+//        instrumenter.attachExecutionEventFactory(
+//                callsFilter,
+//                inputFilter,
+//                context -> {
+//                    boolean doIsRequireCall = context.getInstrumentedSourceSection().getCharacters().toString().startsWith("require(");
+//                    String pathToSource = context.getInstrumentedSourceSection().getSource().getPath();
+//                    return new SomeTestCallExecutionEventNode(doIsRequireCall, pathToSource, LIBRARY_ROOT_DIR.getValue(env.getOptions()), SimpleCoverageInstrument.this);
+//                });
     }
 
     /**
