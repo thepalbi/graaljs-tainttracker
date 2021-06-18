@@ -33,10 +33,8 @@ public class PropagatorsTest {
     @Parameterized.Parameters(name = "Propagation through {2}")
     public static Collection data() {
         return Arrays.asList(
-                new Object[][]{
-                        new Object[]{"propagation/binary-ops.js", 3, "binary ops"}
-                }
-        );
+                new Object[]{"propagation/binary-ops.js", 3, "binary ops"},
+                new Object[]{"propagation/prop-read.js", 2, "prop read"});
     }
 
     @Test

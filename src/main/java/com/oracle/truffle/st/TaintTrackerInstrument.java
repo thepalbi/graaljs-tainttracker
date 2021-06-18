@@ -56,6 +56,7 @@ import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
 import com.oracle.truffle.st.meta.SimpleMetaStore;
 import com.oracle.truffle.st.propagators.BinaryOperationPropagator;
 import com.oracle.truffle.st.propagators.FunctionCallPropagator;
+import com.oracle.truffle.st.propagators.PropReadPropagator;
 import com.oracle.truffle.st.propagators.RequirePropagator;
 import org.graalvm.options.*;
 
@@ -170,6 +171,11 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
                 SourceSectionFilter.newBuilder().tagIs(JSTags.BinaryOperationTag.class).build(),
                 inputFilter,
                 ctx -> new BinaryOperationPropagator(TaintTrackerInstrument.this));
+
+        instrumenter.attachExecutionEventFactory(
+                SourceSectionFilter.newBuilder().tagIs(JSTags.ReadPropertyTag.class).build(),
+                inputFilter,
+                ctx -> new PropReadPropagator(TaintTrackerInstrument.this));
 
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
