@@ -41,6 +41,7 @@
 package com.oracle.truffle.st;
 
 import com.oracle.truffle.api.Option;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.Instrumenter;
 import com.oracle.truffle.api.instrumentation.SourceSectionFilter;
 import com.oracle.truffle.api.instrumentation.StandardTags;
@@ -51,14 +52,13 @@ import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.js.nodes.instrumentation.JSTags;
-import com.oracle.truffle.js.runtime.objects.JSDynamicObject;
-import com.oracle.truffle.js.runtime.objects.PropertyDescriptor;
+import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
+import com.oracle.truffle.st.meta.SimpleMetaStore;
+import com.oracle.truffle.st.propagators.FunctionCallPropagator;
 import com.oracle.truffle.st.propagators.RequirePropagator;
 import org.graalvm.options.*;
 
 import java.io.PrintStream;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Example for simple version of an expression coverage instrument.
@@ -77,6 +77,8 @@ import java.util.stream.Collectors;
  */
 @Registration(id = TaintTrackerInstrument.ID, name = "Simple Taint Tracker", version = "0.1", services = TaintTrackerInstrument.class)
 public final class TaintTrackerInstrument extends TruffleInstrument {
+
+    private SimpleMetaStore metaStore = new SimpleMetaStore(false);
 
     // @formatter:off
     /**
@@ -170,31 +172,32 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
                 inputFilter,
                 ctx -> new RequirePropagator(ctx));
 
+        // Inject taint on return values of specific func, and log taint value of arguments
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
                 inputFilter,
-                ctx -> new InputCapturerEventExecutionNode() {
+                ctx -> new FunctionCallPropagator() {
 
-                    private String source = ctx.getInstrumentedSourceSection().getCharacters().toString();
+                    private final String callSourceCode = ctx.getInstrumentedSourceSection().getCharacters().toString();
 
                     @Override
-                    protected void beforeEvaluation(Object[] inputValues) {
-
+                    protected void onEnter(VirtualFrame frame) {
+                        trace("Entry in call: %s", callSourceCode);
                     }
 
                     @Override
-                    protected void afterEvaluation(Object[] inputValues, Object result) {
-                        trace("[%s] - Returning object of class %s - %s", source, result.getClass(), result.hashCode());
-                        if (result instanceof JSDynamicObject) {
-                            JSDynamicObject jsObject = (JSDynamicObject) result;
-                            trace("Printing result object fields");
-                            List<String> keys = jsObject.getOwnPropertyKeys(true, false)
-                                    .stream().map(k -> (String) k)
-                                    .collect(Collectors.toList());
-                            for (String k : keys) {
-                                PropertyDescriptor prop = jsObject.getOwnProperty(k);
-                                trace("Property key=[%s] val=[%s]", k, prop.getValue().getClass());
-                            }
+                    protected void beforeCall(Object receiver, JSFunctionObject function, Object[] arguments) {
+                        for (int i = 0; i < arguments.length; i++) {
+                            trace("Argument %d: Tainted = %s", i, metaStore.retrieve(arguments[i]));
+                        }
+                    }
+
+                    @Override
+                    protected void afterCall(Object receiver, JSFunctionObject function, Object[] arguments, Object result) {
+                        if (callSourceCode.startsWith("createSensitive")) {
+                            // This function result produces taint
+                            trace("Tainting resulting object of type: %s", result.getClass());
+                            metaStore.store(result, true);
                         }
                     }
                 });

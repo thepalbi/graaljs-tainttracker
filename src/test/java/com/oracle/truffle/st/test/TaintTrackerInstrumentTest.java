@@ -149,7 +149,7 @@ public class TaintTrackerInstrumentTest {
 
     @Test
     public void explorationTest() throws IOException {
-        String souceToExplore = readResourceAsString("test.js");
+        String souceToExplore = readResourceAsString("taint-flow.js");
         Assume.assumeTrue(Engine.create().getLanguages().containsKey("js"));
         // This is how we can create a context with our tool enabled if we are embeddined in java
         try (Context context = Context.newBuilder("js").option(TaintTrackerInstrument.ID, "true").build()) {
