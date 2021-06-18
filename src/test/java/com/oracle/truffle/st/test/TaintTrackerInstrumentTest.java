@@ -50,8 +50,8 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.Scanner;
+
+import static com.oracle.truffle.st.test.TestUtils.readResourceAsString;
 
 public class TaintTrackerInstrumentTest {
 
@@ -143,14 +143,9 @@ public class TaintTrackerInstrumentTest {
         }
     }
 
-    public String readResourceAsString(String resourceName) {
-        InputStream testJSFile = getClass().getClassLoader().getResourceAsStream(resourceName);
-        return new Scanner(testJSFile, "UTF-8").useDelimiter("\\A").next();
-    }
-
     @Test
     public void explorationTest() throws IOException {
-        String souceToExplore = readResourceAsString("taint-flow.js");
+        String souceToExplore = readResourceAsString(getClass().getClassLoader().getResourceAsStream("propagation/binary-ops.js"));
         Assume.assumeTrue(Engine.create().getLanguages().containsKey("js"));
         // This is how we can create a context with our tool enabled if we are embeddined in java
         try (Context context = Context.newBuilder("js").option(TaintTrackerInstrument.ID, "true").build()) {
