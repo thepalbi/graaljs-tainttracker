@@ -9,6 +9,7 @@ import java.util.Map;
 public class SimpleMetaStore {
     private Map<Object, Boolean> nativeTypeStore = new HashMap<>();
     private final Boolean defaultValue;
+    private Integer taintedCount = 0;
 
     public SimpleMetaStore(Boolean defaultValue) {
         this.defaultValue = defaultValue;
@@ -24,6 +25,7 @@ public class SimpleMetaStore {
         } else {
             nativeTypeStore.put(container, value);
         }
+        taintedCount++;
     }
 
     public boolean retrieve(Object container) {
@@ -37,5 +39,9 @@ public class SimpleMetaStore {
         } else {
             return nativeTypeStore.getOrDefault(container, defaultValue);
         }
+    }
+
+    public Integer getTaintedCount() {
+        return taintedCount;
     }
 }

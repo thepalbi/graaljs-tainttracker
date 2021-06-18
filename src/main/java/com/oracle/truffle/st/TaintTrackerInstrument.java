@@ -162,8 +162,6 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
      * @param env The environment, used to get the {@link Instrumenter}
      */
     private void enable(final Env env) {
-        SourceSectionFilter propertyReadFilter = SourceSectionFilter.newBuilder().tagIs(JSTags.ReadPropertyTag.class).build();
-        SourceSectionFilter callsFilter = SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build();
         SourceSectionFilter inputFilter = SourceSectionFilter.newBuilder().tagIs(StandardTags.ExpressionTag.class, JSTags.InputNodeTag.class).build();
         Instrumenter instrumenter = env.getInstrumenter();
 
@@ -215,5 +213,9 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
     @Override
     protected OptionDescriptors getOptionDescriptors() {
         return new SimpleCoverageInstrumentOptionDescriptors();
+    }
+
+    public int getTaintedCount() {
+        return metaStore.getTaintedCount();
     }
 }

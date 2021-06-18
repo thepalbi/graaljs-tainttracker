@@ -44,6 +44,7 @@ import com.oracle.truffle.st.TaintTrackerInstrument;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Source;
+import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -155,6 +156,9 @@ public class TaintTrackerInstrumentTest {
         try (Context context = Context.newBuilder("js").option(TaintTrackerInstrument.ID, "true").build()) {
             Source source = Source.newBuilder("js", souceToExplore, "main").build();
             context.eval(source);
+
+            TaintTrackerInstrument instrument = context.getEngine().getInstruments().get(TaintTrackerInstrument.ID).lookup(TaintTrackerInstrument.class);
+            Assert.assertEquals(2, instrument.getTaintedCount());
         }
     }
 
