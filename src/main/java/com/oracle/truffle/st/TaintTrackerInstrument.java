@@ -54,6 +54,7 @@ import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.js.nodes.instrumentation.JSTags;
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
 import com.oracle.truffle.st.meta.SimpleMetaStore;
+import com.oracle.truffle.st.propagators.BinaryOperationPropagator;
 import com.oracle.truffle.st.propagators.FunctionCallPropagator;
 import com.oracle.truffle.st.propagators.RequirePropagator;
 import org.graalvm.options.*;
@@ -127,7 +128,7 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
         }
     }
 
-    static void trace(String message, Object... parameters) {
+    public static void trace(String message, Object... parameters) {
         if (TRACE) {
             PrintStream out = System.out;
             out.println("TaintTracker: " + String.format(message, parameters));
@@ -164,6 +165,11 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
     private void enable(final Env env) {
         SourceSectionFilter inputFilter = SourceSectionFilter.newBuilder().tagIs(StandardTags.ExpressionTag.class, JSTags.InputNodeTag.class).build();
         Instrumenter instrumenter = env.getInstrumenter();
+
+        instrumenter.attachExecutionEventFactory(
+                SourceSectionFilter.newBuilder().tagIs(JSTags.BinaryOperationTag.class).build(),
+                inputFilter,
+                ctx -> new BinaryOperationPropagator(TaintTrackerInstrument.this));
 
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
@@ -217,5 +223,13 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
 
     public int getTaintedCount() {
         return metaStore.getTaintedCount();
+    }
+
+    public void taint(Object taintee) {
+        metaStore.store(taintee, true);
+    }
+
+    public boolean isTainted(Object taintee) {
+        return metaStore.retrieve(taintee);
     }
 }

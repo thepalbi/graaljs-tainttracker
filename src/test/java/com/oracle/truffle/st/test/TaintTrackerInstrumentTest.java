@@ -158,7 +158,7 @@ public class TaintTrackerInstrumentTest {
             context.eval(source);
 
             TaintTrackerInstrument instrument = context.getEngine().getInstruments().get(TaintTrackerInstrument.ID).lookup(TaintTrackerInstrument.class);
-            Assert.assertEquals(2, instrument.getTaintedCount());
+            Assert.assertEquals(3, instrument.getTaintedCount());
         }
     }
 

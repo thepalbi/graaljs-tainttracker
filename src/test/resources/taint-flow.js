@@ -12,4 +12,5 @@ function createSensitiveNativeObject(name) {
 }
 
 let anotherTaintedMessage = createSensitiveNativeObject("pablo");
-console.log(anotherTaintedMessage);
+let taintedByBinaryOp = anotherTaintedMessage + "more taint inside";
+console.log(taintedByBinaryOp);
