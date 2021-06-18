@@ -40,22 +40,19 @@
  */
 package com.oracle.truffle.st.test;
 
-import java.io.IOException;
-import java.util.Map;
-import java.util.Set;
-
+import com.oracle.truffle.st.TaintTrackerInstrument;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Source;
-import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import com.oracle.truffle.st.Coverage;
-import com.oracle.truffle.st.SimpleCoverageInstrument;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Scanner;
 
-public class SimpleCoverageInstrumentTest {
+public class TaintTrackerInstrumentTest {
 
     private static final String SIMPLE_CALL_JS_SOURCE = "function sum(x, y) {\n" +
             "return x + y;\n" +
@@ -139,10 +136,25 @@ public class SimpleCoverageInstrumentTest {
         // This test only makes sense if JS is available.
         Assume.assumeTrue(Engine.create().getLanguages().containsKey("js"));
         // This is how we can create a context with our tool enabled if we are embeddined in java
-        try (Context context = Context.newBuilder("js").option(SimpleCoverageInstrument.ID, "true").option(SimpleCoverageInstrument.ID + ".PrintCoverage", "false").build()) {
+        try (Context context = Context.newBuilder("js").option(TaintTrackerInstrument.ID, "true").option(TaintTrackerInstrument.ID + ".PrintCoverage", "false").build()) {
             Source source = Source.newBuilder("js", JS_SOURCE, "main").build();
             context.eval(source);
-            assertJSCorrect(context);
+        }
+    }
+
+    public String readResourceAsString(String resourceName) {
+        InputStream testJSFile = getClass().getClassLoader().getResourceAsStream(resourceName);
+        return new Scanner(testJSFile, "UTF-8").useDelimiter("\\A").next();
+    }
+
+    @Test
+    public void explorationTest() throws IOException {
+        String souceToExplore = readResourceAsString("test.js");
+        Assume.assumeTrue(Engine.create().getLanguages().containsKey("js"));
+        // This is how we can create a context with our tool enabled if we are embeddined in java
+        try (Context context = Context.newBuilder("js").option(TaintTrackerInstrument.ID, "true").build()) {
+            Source source = Source.newBuilder("js", souceToExplore, "main").build();
+            context.eval(source);
         }
     }
 
@@ -151,30 +163,9 @@ public class SimpleCoverageInstrumentTest {
         // This test only makes sense if JS is available.
         Assume.assumeTrue(Engine.create().getLanguages().containsKey("js"));
         // This is how we can create a context with our tool enabled if we are embeddined in java
-        try (Context context = Context.newBuilder("js").option(SimpleCoverageInstrument.ID, "true").option(SimpleCoverageInstrument.ID + ".PrintCoverage", "false").build()) {
+        try (Context context = Context.newBuilder("js").option(TaintTrackerInstrument.ID, "true").build()) {
             Source source = Source.newBuilder("js", SIMPLE_CALL_JS_SOURCE, "main").build();
             context.eval(source);
         }
-    }
-
-    // NOTE: This lookup mechanism used in this method does not work in normal deployments
-    // due to Truffles class path issolation. Services can be looked up by other
-    // instruments, but not by the embedder. We can do this in the tests because the
-    // class path issolation is disabled in the pom.xml file by adding -XX:-UseJVMCIClassLoader to
-    // the command line.
-    // This command line flag should never be used in production.
-    private static void assertJSCorrect(final Context context) {
-        // We can lookup services exported by the instrument, in our case this is
-        // the instrument itself but it does not have to be.
-        SimpleCoverageInstrument coverageInstrument = context.getEngine().getInstruments().get(SimpleCoverageInstrument.ID).lookup(SimpleCoverageInstrument.class);
-        // We then use the looked up service to assert that it behaves as expected, just like in any
-        // other test.
-        Map<com.oracle.truffle.api.source.Source, Coverage> coverageMap = coverageInstrument.getCoverageMap();
-        Assert.assertEquals(1, coverageMap.size());
-        coverageMap.forEach((com.oracle.truffle.api.source.Source s, Coverage v) -> {
-            Set<Integer> notYetCoveredLineNumbers = coverageInstrument.nonCoveredLineNumbers(s);
-            Object[] expected = new Integer[]{47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 61, 67};
-            Assert.assertArrayEquals(expected, notYetCoveredLineNumbers.stream().sorted().toArray());
-        });
     }
 }

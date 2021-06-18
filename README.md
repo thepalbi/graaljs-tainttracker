@@ -10,3 +10,6 @@ This repository is licensed under the permissive UPL licence. Fork it to begin
 your own Truffle tool.
 
 For instructions on how to get started please refer to [our website](https://www.graalvm.org/docs/graalvm-as-a-platform/implement-instrument/)
+
+## Development notes
+- [JVM being used: Graal JVM CE Build 21.1, Java 11 based](https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-21.1.0/graalvm-ce-java11-darwin-amd64-21.1.0.tar.gz)

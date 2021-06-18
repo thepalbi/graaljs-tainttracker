@@ -1,6 +1,5 @@
 package com.oracle.truffle.st;
 
-import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.EventContext;
 import com.oracle.truffle.api.instrumentation.ExecutionEventNode;
@@ -10,9 +9,9 @@ public class CallCapturerNode extends ExecutionEventNode {
 
     private final String callSourceCode;
     private final String prefix;
-    private final SimpleCoverageInstrument instrument;
+    private final TaintTrackerInstrument instrument;
 
-    CallCapturerNode(SimpleCoverageInstrument instrument, SourceSection instrumentedSourceSection, String prefix) {
+    CallCapturerNode(TaintTrackerInstrument instrument, SourceSection instrumentedSourceSection, String prefix) {
         this.instrument = instrument;
         this.callSourceCode = instrumentedSourceSection.getCharacters().toString();
         this.prefix = prefix;

@@ -1,7 +1,8 @@
-package com.oracle.truffle.st;
+package com.oracle.truffle.st.propagators;
 
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
 import com.oracle.truffle.js.runtime.objects.JSDynamicObject;
+import com.oracle.truffle.st.InputCapturerEventExecutionNode;
 
 public abstract class FunctionCallPropagator extends InputCapturerEventExecutionNode {
 
