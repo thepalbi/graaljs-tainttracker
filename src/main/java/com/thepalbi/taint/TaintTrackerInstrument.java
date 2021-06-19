@@ -183,9 +183,7 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.ReadPropertyTag.class).build(),
                 inputFilter,
-                ctx -> {
-                    return new PropReadPropagator(TaintTrackerInstrument.this, ctx);
-                });
+                ctx -> new PropReadPropagator(TaintTrackerInstrument.this, ctx));
 
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),

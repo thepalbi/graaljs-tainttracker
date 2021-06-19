@@ -14,12 +14,22 @@ public abstract class InputCapturerEventExecutionNode extends ExecutionEventNode
     protected void onInputValue(VirtualFrame frame, EventContext inputContext, int inputIndex, Object inputValue) {
         saveInputValue(frame, inputIndex, inputValue);
         if (inputIndex == getInputCount() - 1) {
-            beforeEvaluation(getSavedInputValues(frame));
+            try {
+                beforeEvaluation(getSavedInputValues(frame));
+            } catch (Exception e) {
+                System.err.printf("onInputValue - Catch JSException in class %s: %s\n", getClass().getName(), e.getMessage());
+                throw e;
+            }
         }
     }
 
     @Override
     protected void onReturnValue(VirtualFrame frame, Object result) {
-        afterEvaluation(getSavedInputValues(frame), result);
+        try {
+            afterEvaluation(getSavedInputValues(frame), result);
+        } catch (Exception e) {
+            System.err.printf("onReturnValue - Catch JSException in class %s: %s\n", getClass().getName(), e.getMessage());
+            throw e;
+        }
     }
 }
