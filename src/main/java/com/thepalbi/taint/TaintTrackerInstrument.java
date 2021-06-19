@@ -38,7 +38,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.oracle.truffle.st;
+package com.thepalbi.taint;
 
 import com.oracle.truffle.api.Option;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -51,18 +51,17 @@ import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.js.nodes.instrumentation.JSTags;
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
-import com.oracle.truffle.st.endpoints.FunctionCallEndpoint;
-import com.oracle.truffle.st.endpoints.KnownSinkEndpoint;
-import com.oracle.truffle.st.meta.SimpleMetaStore;
-import com.oracle.truffle.st.propagators.BinaryOperationPropagator;
-import com.oracle.truffle.st.propagators.PropReadPropagator;
-import com.oracle.truffle.st.endpoints.RequireEndpoint;
-import com.oracle.truffle.st.propagators.UnaryOperationPropagator;
+import com.thepalbi.taint.endpoints.FunctionCallEndpoint;
+import com.thepalbi.taint.endpoints.KnownSinkEndpoint;
+import com.thepalbi.taint.meta.SimpleMetaStore;
+import com.thepalbi.taint.propagators.BinaryOperationPropagator;
+import com.thepalbi.taint.propagators.PropReadPropagator;
+import com.thepalbi.taint.endpoints.RequireEndpoint;
+import com.thepalbi.taint.propagators.UnaryOperationPropagator;
 import org.graalvm.options.*;
 
 import java.io.PrintStream;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashSet;
 
 /**
@@ -102,6 +101,9 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
 
     @Option(name = "KnownSinkName", help = "Name of a known sink (this will be extended)", category = OptionCategory.USER, stability = OptionStability.STABLE)
     static final OptionKey<String> KNOWN_SINK_NAME = new OptionKey<>("nonExistentFunc");
+
+    @Option(name = "Testing", help = "Enable testing taint injector", category = OptionCategory.INTERNAL, stability = OptionStability.STABLE)
+    static final OptionKey<Boolean> IS_TESTING = new OptionKey<>(false);
     // @formatter:on
 
     static private boolean TRACE = Boolean.getBoolean("ttracker.debug.trace");
@@ -182,25 +184,13 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
                 SourceSectionFilter.newBuilder().tagIs(JSTags.ReadPropertyTag.class).build(),
                 inputFilter,
                 ctx -> {
-                    // Try to read key like NodeProf
-                    // https://github.com/Haiyang-Sun/nodeprof.js/blob/c513652ba0845667badf109278ca60e17bd3f3ac/src/ch.usi.inf.nodeprof/src/ch/usi/inf/nodeprof/handlers/BaseEventHandlerNode.java#L141
-
-                    InstrumentableNode node = (InstrumentableNode) ctx.getInstrumentedNode();
-                    Object obj = node.getNodeObject();
-
-                    try {
-                        Object property = InteropLibrary.getFactory().getUncached().readMember(obj, "key");
-                        trace("Property being read: %s", property);
-                    } catch (Exception e) {
-                        trace("Failed to read property key: %s", e);
-                    }
                     return new PropReadPropagator(TaintTrackerInstrument.this, ctx);
                 });
 
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
                 inputFilter,
-                ctx -> new RequireEndpoint(ctx));
+                ctx -> new RequireEndpoint(TaintTrackerInstrument.this, ctx, LIBRARY_ROOT_DIR.getValue(env.getOptions())));
 
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
@@ -209,35 +199,42 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
                         KNOWN_SINK_NAME.getValue(env.getOptions())
                 ))));
 
-        // Inject taint on return values of specific func, and log taint value of arguments
-        instrumenter.attachExecutionEventFactory(
-                SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
-                inputFilter,
-                ctx -> new FunctionCallEndpoint() {
+        if (IS_TESTING.getValue(env.getOptions())) {
+            // Inject taint on return values of specific func, and log taint value of arguments
+            instrumenter.attachExecutionEventFactory(
+                    SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
+                    inputFilter,
+                    ctx -> new FunctionCallEndpoint() {
 
-                    private final String callSourceCode = ctx.getInstrumentedSourceSection().getCharacters().toString();
+                        private final String callSourceCode = ctx.getInstrumentedSourceSection().getCharacters().toString();
 
-                    @Override
-                    protected void onEnter(VirtualFrame frame) {
-                        trace("Entry in call: %s", callSourceCode);
-                    }
-
-                    @Override
-                    protected void beforeCall(Object receiver, JSFunctionObject function, Object[] arguments) {
-                        for (int i = 0; i < arguments.length; i++) {
-                            trace("Argument %d: Tainted = %s", i, metaStore.retrieve(arguments[i]));
+                        @Override
+                        protected void onEnter(VirtualFrame frame) {
+                            trace("Entry in call: %s", callSourceCode);
                         }
-                    }
 
-                    @Override
-                    protected void afterCall(Object receiver, JSFunctionObject function, Object[] arguments, Object result) {
-                        if (callSourceCode.startsWith("createSensitive")) {
-                            // This function result produces taint
-                            trace("Tainting resulting object of type: %s", result.getClass());
-                            metaStore.store(result, true);
+                        @Override
+                        protected void beforeCall(Object receiver, JSFunctionObject function, Object[] arguments) {
+                            for (int i = 0; i < arguments.length; i++) {
+                                trace("Argument %d: Tainted = %s", i, metaStore.retrieve(arguments[i]));
+                            }
                         }
-                    }
-                });
+
+                        @Override
+                        protected void afterCall(Object receiver, JSFunctionObject function, Object[] arguments, Object result) {
+                            if (callSourceCode.startsWith("createSensitive")) {
+                                // This function result produces taint
+                                trace("Tainting resulting object of type: %s", result.getClass());
+                                metaStore.store(result, true);
+                            }
+                        }
+                    });
+        }
+    }
+
+    @Override
+    protected void onDispose(Env env) {
+        System.out.printf("Disposing instrment. Seen %d total violations!\n", violationCount);
     }
 
     /**

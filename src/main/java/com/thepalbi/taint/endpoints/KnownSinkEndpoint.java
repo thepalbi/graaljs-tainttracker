@@ -1,7 +1,7 @@
-package com.oracle.truffle.st.endpoints;
+package com.thepalbi.taint.endpoints;
 
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
-import com.oracle.truffle.st.TaintTrackerInstrument;
+import com.thepalbi.taint.TaintTrackerInstrument;
 
 import java.util.Arrays;
 import java.util.Set;

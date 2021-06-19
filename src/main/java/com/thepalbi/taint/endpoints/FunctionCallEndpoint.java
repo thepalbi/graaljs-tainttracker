@@ -1,8 +1,7 @@
-package com.oracle.truffle.st.endpoints;
+package com.thepalbi.taint.endpoints;
 
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
-import com.oracle.truffle.js.runtime.objects.JSDynamicObject;
-import com.oracle.truffle.st.InputCapturerEventExecutionNode;
+import com.thepalbi.taint.InputCapturerEventExecutionNode;
 
 public abstract class FunctionCallEndpoint extends InputCapturerEventExecutionNode {
 

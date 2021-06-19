@@ -1,4 +1,4 @@
-package com.oracle.truffle.st;
+package com.thepalbi.taint;
 
 import java.util.Objects;
 

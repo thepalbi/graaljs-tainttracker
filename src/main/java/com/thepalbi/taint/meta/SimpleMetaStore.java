@@ -1,4 +1,4 @@
-package com.oracle.truffle.st.meta;
+package com.thepalbi.taint.meta;
 
 import com.oracle.truffle.js.runtime.objects.JSDynamicObject;
 import com.oracle.truffle.js.runtime.objects.PropertyDescriptor;

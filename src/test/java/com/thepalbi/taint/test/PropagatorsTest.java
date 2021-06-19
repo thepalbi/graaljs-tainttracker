@@ -1,6 +1,6 @@
-package com.oracle.truffle.st.test;
+package com.thepalbi.taint.test;
 
-import com.oracle.truffle.st.TaintTrackerInstrument;
+import com.thepalbi.taint.TaintTrackerInstrument;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Source;
@@ -14,7 +14,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
-import static com.oracle.truffle.st.test.TestUtils.readResourceAsString;
+import static com.thepalbi.taint.test.TestUtils.readResourceAsString;
 
 @RunWith(Parameterized.class)
 public class PropagatorsTest {
@@ -48,7 +48,9 @@ public class PropagatorsTest {
         // This is how we can create a context with our tool enabled if we are embeddined in java
         try (Context context = Context.newBuilder(JS)
                 .option(TaintTrackerInstrument.ID, "true")
-                .option("tainttracker.KnownSinkName", "log").build()) {
+                .option("tainttracker.KnownSinkName", "log")
+                .option("tainttracker.Testing", "true")
+                .build()) {
             Source source = Source.newBuilder(JS, souceToExplore, "test main").build();
             context.eval(source);
 

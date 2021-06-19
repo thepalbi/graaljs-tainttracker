@@ -1,13 +1,13 @@
-package com.oracle.truffle.st.propagators;
+package com.thepalbi.taint.propagators;
 
 import com.oracle.truffle.api.instrumentation.EventContext;
 import com.oracle.truffle.api.instrumentation.InstrumentableNode;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.js.runtime.builtins.JSGlobalObject;
-import com.oracle.truffle.st.InputCapturerEventExecutionNode;
-import com.oracle.truffle.st.TaintTrackerInstrument;
+import com.thepalbi.taint.InputCapturerEventExecutionNode;
+import com.thepalbi.taint.TaintTrackerInstrument;
 
-import static com.oracle.truffle.st.TaintTrackerInstrument.trace;
+import static com.thepalbi.taint.TaintTrackerInstrument.trace;
 
 
 public class PropReadPropagator extends InputCapturerEventExecutionNode {

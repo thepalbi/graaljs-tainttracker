@@ -1,4 +1,4 @@
-package com.oracle.truffle.st;
+package com.thepalbi.taint;
 
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.EventContext;

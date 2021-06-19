@@ -1,7 +1,7 @@
-package com.oracle.truffle.st.propagators;
+package com.thepalbi.taint.propagators;
 
-import com.oracle.truffle.st.InputCapturerEventExecutionNode;
-import com.oracle.truffle.st.TaintTrackerInstrument;
+import com.thepalbi.taint.InputCapturerEventExecutionNode;
+import com.thepalbi.taint.TaintTrackerInstrument;
 
 public class UnaryOperationPropagator extends InputCapturerEventExecutionNode {
 

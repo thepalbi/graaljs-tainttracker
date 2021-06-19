@@ -38,20 +38,17 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.oracle.truffle.st.test;
+package com.thepalbi.taint.test;
 
-import com.oracle.truffle.st.TaintTrackerInstrument;
+import com.thepalbi.taint.TaintTrackerInstrument;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Source;
-import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
-
-import static com.oracle.truffle.st.test.TestUtils.readResourceAsString;
 
 public class TaintTrackerInstrumentTest {
 
@@ -140,20 +137,6 @@ public class TaintTrackerInstrumentTest {
         try (Context context = Context.newBuilder("js").option(TaintTrackerInstrument.ID, "true").option(TaintTrackerInstrument.ID + ".PrintCoverage", "false").build()) {
             Source source = Source.newBuilder("js", JS_SOURCE, "main").build();
             context.eval(source);
-        }
-    }
-
-    @Test
-    public void explorationTest() throws IOException {
-        String souceToExplore = readResourceAsString(getClass().getClassLoader().getResourceAsStream("propagation/binary-ops.js"));
-        Assume.assumeTrue(Engine.create().getLanguages().containsKey("js"));
-        // This is how we can create a context with our tool enabled if we are embeddined in java
-        try (Context context = Context.newBuilder("js").option(TaintTrackerInstrument.ID, "true").build()) {
-            Source source = Source.newBuilder("js", souceToExplore, "main").build();
-            context.eval(source);
-
-            TaintTrackerInstrument instrument = context.getEngine().getInstruments().get(TaintTrackerInstrument.ID).lookup(TaintTrackerInstrument.class);
-            Assert.assertEquals(3, instrument.getTaintedCount());
         }
     }
 
