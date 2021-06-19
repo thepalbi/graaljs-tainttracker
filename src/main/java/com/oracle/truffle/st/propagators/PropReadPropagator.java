@@ -1,16 +1,41 @@
 package com.oracle.truffle.st.propagators;
 
+import com.oracle.truffle.api.instrumentation.EventContext;
+import com.oracle.truffle.api.instrumentation.InstrumentableNode;
+import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.js.runtime.builtins.JSGlobalObject;
 import com.oracle.truffle.st.InputCapturerEventExecutionNode;
 import com.oracle.truffle.st.TaintTrackerInstrument;
 
-public class PropReadPropagator extends InputCapturerEventExecutionNode {
-    private final TaintTrackerInstrument instrument;
+import static com.oracle.truffle.st.TaintTrackerInstrument.trace;
 
-    public PropReadPropagator(TaintTrackerInstrument instrument) {
+
+public class PropReadPropagator extends InputCapturerEventExecutionNode {
+    public static final String PROPERTY_READ_KEY = "key";
+    private final TaintTrackerInstrument instrument;
+    private final Object propertyKey;
+
+    public PropReadPropagator(TaintTrackerInstrument instrument, EventContext ctx) {
         this.instrument = instrument;
+
+        // Try to read key like NodeProf
+        // https://github.com/Haiyang-Sun/nodeprof.js/blob/c513652ba0845667badf109278ca60e17bd3f3ac/src/ch.usi.inf.nodeprof/src/ch/usi/inf/nodeprof/handlers/BaseEventHandlerNode.java#L141
+        InstrumentableNode node = (InstrumentableNode) ctx.getInstrumentedNode();
+        propertyKey = readMemberOrNull(node.getNodeObject(), PROPERTY_READ_KEY);
+        if (propertyKey != null) {
+            trace("PropReadPropagator#constructor - Property being read: %s", propertyKey);
+        } else {
+            trace("PropReadPropagator#constructor - Failed to read property key");
+        }
     }
 
+    private Object readMemberOrNull(Object base, String member) {
+        try {
+            return InteropLibrary.getFactory().getUncached().readMember(base, member);
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     @Override
     protected void beforeEvaluation(Object[] inputValues) {

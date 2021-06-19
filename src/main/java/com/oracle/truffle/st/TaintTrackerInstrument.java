@@ -42,12 +42,12 @@ package com.oracle.truffle.st;
 
 import com.oracle.truffle.api.Option;
 import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.api.instrumentation.Instrumenter;
-import com.oracle.truffle.api.instrumentation.SourceSectionFilter;
-import com.oracle.truffle.api.instrumentation.StandardTags;
+import com.oracle.truffle.api.instrumentation.*;
 import com.oracle.truffle.api.instrumentation.StandardTags.ExpressionTag;
-import com.oracle.truffle.api.instrumentation.TruffleInstrument;
 import com.oracle.truffle.api.instrumentation.TruffleInstrument.Registration;
+import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.interop.UnknownIdentifierException;
+import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
@@ -175,7 +175,21 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.ReadPropertyTag.class).build(),
                 inputFilter,
-                ctx -> new PropReadPropagator(TaintTrackerInstrument.this));
+                ctx -> {
+                    // Try to read key like NodeProf
+                    // https://github.com/Haiyang-Sun/nodeprof.js/blob/c513652ba0845667badf109278ca60e17bd3f3ac/src/ch.usi.inf.nodeprof/src/ch/usi/inf/nodeprof/handlers/BaseEventHandlerNode.java#L141
+
+                    InstrumentableNode node = (InstrumentableNode) ctx.getInstrumentedNode();
+                    Object obj = node.getNodeObject();
+
+                    try {
+                        Object property = InteropLibrary.getFactory().getUncached().readMember(obj, "key");
+                        trace("Property being read: %s", property);
+                    } catch (Exception e) {
+                        trace("Failed to read property key: %s", e);
+                    }
+                    return new PropReadPropagator(TaintTrackerInstrument.this, ctx);
+                });
 
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
