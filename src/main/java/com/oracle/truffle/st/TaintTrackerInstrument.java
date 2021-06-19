@@ -46,21 +46,23 @@ import com.oracle.truffle.api.instrumentation.*;
 import com.oracle.truffle.api.instrumentation.StandardTags.ExpressionTag;
 import com.oracle.truffle.api.instrumentation.TruffleInstrument.Registration;
 import com.oracle.truffle.api.interop.InteropLibrary;
-import com.oracle.truffle.api.interop.UnknownIdentifierException;
-import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.js.nodes.instrumentation.JSTags;
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
+import com.oracle.truffle.st.endpoints.FunctionCallEndpoint;
+import com.oracle.truffle.st.endpoints.KnownSinkEndpoint;
 import com.oracle.truffle.st.meta.SimpleMetaStore;
 import com.oracle.truffle.st.propagators.BinaryOperationPropagator;
-import com.oracle.truffle.st.propagators.FunctionCallPropagator;
 import com.oracle.truffle.st.propagators.PropReadPropagator;
-import com.oracle.truffle.st.propagators.RequirePropagator;
+import com.oracle.truffle.st.endpoints.RequireEndpoint;
 import org.graalvm.options.*;
 
 import java.io.PrintStream;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
 
 /**
  * Example for simple version of an expression coverage instrument.
@@ -80,6 +82,7 @@ import java.io.PrintStream;
 @Registration(id = TaintTrackerInstrument.ID, name = "Simple Taint Tracker", version = "0.1", services = TaintTrackerInstrument.class)
 public final class TaintTrackerInstrument extends TruffleInstrument {
 
+    private Integer violationCount = 0;
     private SimpleMetaStore metaStore = new SimpleMetaStore(false);
 
     // @formatter:off
@@ -89,23 +92,20 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
     @Option(name = "", help = "Enable Simple Coverage (default: false).", category = OptionCategory.USER, stability = OptionStability.STABLE)
     static final OptionKey<Boolean> ENABLED = new OptionKey<>(false);
 
-    /**
-     * Look at {@link #onCreate(Env)} and {@link #getOptionDescriptors()} for more info.
-     */
-    @Option(name = "PrintCoverage", help = "Print coverage to stdout on process exit (default: true).", category = OptionCategory.USER, stability = OptionStability.STABLE)
-    static final OptionKey<Boolean> PRINT_COVERAGE = new OptionKey<>(true);
-
     // @formatter:off
     /**
      * Look at {@link #onCreate(Env)} and {@link #getOptionDescriptors()} for more info.
      */
     @Option(name = "LibraryRootDir", help = "Library root dir to consider requires as entry points (defaults to spawn).", category = OptionCategory.USER, stability = OptionStability.STABLE)
     static final OptionKey<String> LIBRARY_ROOT_DIR = new OptionKey<>("/Users/pabbalbi/tesis/slim-taser/test_libs/spawn");
+
+    @Option(name = "KnownSinkName", help = "Name of a known sink (this will be extended)", category = OptionCategory.USER, stability = OptionStability.STABLE)
+    static final OptionKey<String> KNOWN_SINK_NAME = new OptionKey<>("nonExistentFunc");
     // @formatter:on
 
     static private boolean TRACE = Boolean.getBoolean("ttracker.debug.trace");
 
-    public static final String ID = "simple-code-coverage";
+    public static final String ID = "tainttracker";
 
     /**
      * Each instrument must override the {@link TruffleInstrument#onCreate(com.oracle.truffle.api.instrumentation.TruffleInstrument.Env)}
@@ -113,7 +113,7 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
      * <p>
      * This method is used to properly initialize the instrument. A common practice is to use the {@link Option} system
      * to enable and configure the instrument, as is done in this method. Defining {@link Option}s as is shown in {@link
-     * #ENABLED} and {@link #PRINT_COVERAGE}, and their usage can be seen in the SimpleCoverageInstrumentTest when the
+     * #ENABLED} and , and their usage can be seen in the SimpleCoverageInstrumentTest when the
      * context is being created. Using them from the command line is shown in the simpletool.sh script.
      *
      * @param env the environment for the instrument. Allows us to read the {@link Option}s, input and output streams to
@@ -194,13 +194,20 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
                 inputFilter,
-                ctx -> new RequirePropagator(ctx));
+                ctx -> new RequireEndpoint(ctx));
+
+        instrumenter.attachExecutionEventFactory(
+                SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
+                inputFilter,
+                ctx -> new KnownSinkEndpoint(TaintTrackerInstrument.this, new HashSet<>(Arrays.asList(
+                        KNOWN_SINK_NAME.getValue(env.getOptions())
+                ))));
 
         // Inject taint on return values of specific func, and log taint value of arguments
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
                 inputFilter,
-                ctx -> new FunctionCallPropagator() {
+                ctx -> new FunctionCallEndpoint() {
 
                     private final String callSourceCode = ctx.getInstrumentedSourceSection().getCharacters().toString();
 
@@ -251,5 +258,13 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
 
     public boolean isTainted(Object taintee) {
         return metaStore.retrieve(taintee);
+    }
+
+    public void registerViolation() {
+        violationCount++;
+    }
+
+    public Integer getViolationCount() {
+        return violationCount;
     }
 }

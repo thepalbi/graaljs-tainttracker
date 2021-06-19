@@ -22,19 +22,22 @@ public class PropagatorsTest {
     public static final String JS = "js";
     private String sourceResource;
     private int expectedTaints;
+    private final Integer expectedViolations;
     private String label;
 
-    public PropagatorsTest(String sourceResource, Integer expectedTaints, String label) {
+    public PropagatorsTest(String sourceResource, Integer expectedTaints, Integer expectedViolations, String label) {
         this.sourceResource = sourceResource;
         this.expectedTaints = expectedTaints;
+        this.expectedViolations = expectedViolations;
         this.label = label;
     }
 
-    @Parameterized.Parameters(name = "Propagation through {2}")
+    @Parameterized.Parameters(name = "Propagation through {3}")
     public static Collection data() {
         return Arrays.asList(
-                new Object[]{"propagation/binary-ops.js", 3, "binary ops"},
-                new Object[]{"propagation/prop-read.js", 2, "prop read"});
+                new Object[]{"propagation/binary-ops.js", 2, 1, "binary ops"},
+                new Object[]{"propagation/prop-read.js", 2, 1, "prop read, base is tainted"},
+                new Object[]{"propagation/prop-read-2.js", 1, 1, "prop read, member is tainted"});
     }
 
     @Test
@@ -42,12 +45,15 @@ public class PropagatorsTest {
         String souceToExplore = readResourceAsString(getClass().getClassLoader().getResourceAsStream(sourceResource));
         Assume.assumeTrue(Engine.create().getLanguages().containsKey(JS));
         // This is how we can create a context with our tool enabled if we are embeddined in java
-        try (Context context = Context.newBuilder(JS).option(TaintTrackerInstrument.ID, "true").build()) {
+        try (Context context = Context.newBuilder(JS)
+                .option(TaintTrackerInstrument.ID, "true")
+                .option("tainttracker.KnownSinkName", "log").build()) {
             Source source = Source.newBuilder(JS, souceToExplore, "test main").build();
             context.eval(source);
 
             TaintTrackerInstrument instrument = context.getEngine().getInstruments().get(TaintTrackerInstrument.ID).lookup(TaintTrackerInstrument.class);
-            Assert.assertEquals(expectedTaints, instrument.getTaintedCount());
+            Assert.assertEquals("Expect taint counts to be equal", expectedTaints, instrument.getTaintedCount());
+            Assert.assertEquals("Expect violation count to be equal", expectedViolations, instrument.getViolationCount());
         }
     }
 }

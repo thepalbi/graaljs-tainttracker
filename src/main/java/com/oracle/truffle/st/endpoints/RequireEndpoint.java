@@ -1,17 +1,17 @@
-package com.oracle.truffle.st.propagators;
+package com.oracle.truffle.st.endpoints;
 
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.instrumentation.EventContext;
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
 
 
-public class RequirePropagator extends FunctionCallPropagator {
+public class RequireEndpoint extends FunctionCallEndpoint {
 
     private final String sourcePath;
     @CompilerDirectives.CompilationFinal
     private boolean isRequire;
 
-    public RequirePropagator(EventContext ctx) {
+    public RequireEndpoint(EventContext ctx) {
         sourcePath = ctx.getInstrumentedSourceSection().getSource().getPath();
         isRequire = ctx.getInstrumentedSourceSection().getCharacters().toString().startsWith("require");
     }

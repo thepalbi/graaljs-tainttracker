@@ -1,10 +1,10 @@
-package com.oracle.truffle.st.propagators;
+package com.oracle.truffle.st.endpoints;
 
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
 import com.oracle.truffle.js.runtime.objects.JSDynamicObject;
 import com.oracle.truffle.st.InputCapturerEventExecutionNode;
 
-public abstract class FunctionCallPropagator extends InputCapturerEventExecutionNode {
+public abstract class FunctionCallEndpoint extends InputCapturerEventExecutionNode {
 
     private static final int RECEIVER_INPUT_INDEX = 0;
     private static final int FUNCTION_INPUT_INDEX = 1;
