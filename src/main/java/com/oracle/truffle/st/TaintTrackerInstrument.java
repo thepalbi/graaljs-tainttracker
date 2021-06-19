@@ -57,6 +57,7 @@ import com.oracle.truffle.st.meta.SimpleMetaStore;
 import com.oracle.truffle.st.propagators.BinaryOperationPropagator;
 import com.oracle.truffle.st.propagators.PropReadPropagator;
 import com.oracle.truffle.st.endpoints.RequireEndpoint;
+import com.oracle.truffle.st.propagators.UnaryOperationPropagator;
 import org.graalvm.options.*;
 
 import java.io.PrintStream;
@@ -166,6 +167,11 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
     private void enable(final Env env) {
         SourceSectionFilter inputFilter = SourceSectionFilter.newBuilder().tagIs(StandardTags.ExpressionTag.class, JSTags.InputNodeTag.class).build();
         Instrumenter instrumenter = env.getInstrumenter();
+
+        instrumenter.attachExecutionEventFactory(
+                SourceSectionFilter.newBuilder().tagIs(JSTags.UnaryOperationTag.class).build(),
+                inputFilter,
+                ctx -> new UnaryOperationPropagator(TaintTrackerInstrument.this));
 
         instrumenter.attachExecutionEventFactory(
                 SourceSectionFilter.newBuilder().tagIs(JSTags.BinaryOperationTag.class).build(),

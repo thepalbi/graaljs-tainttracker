@@ -35,6 +35,7 @@ public class PropagatorsTest {
     @Parameterized.Parameters(name = "Propagation through {3}")
     public static Collection data() {
         return Arrays.asList(
+                new Object[]{"propagation/unary-ops.js", 2, 1, "unary ops"},
                 new Object[]{"propagation/binary-ops.js", 2, 1, "binary ops"},
                 new Object[]{"propagation/prop-read.js", 2, 1, "prop read, base is tainted"},
                 new Object[]{"propagation/prop-read-2.js", 1, 1, "prop read, member is tainted"});
