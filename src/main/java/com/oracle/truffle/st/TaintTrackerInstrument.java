@@ -224,7 +224,7 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
      */
     @Override
     protected OptionDescriptors getOptionDescriptors() {
-        return new SimpleCoverageInstrumentOptionDescriptors();
+        return new TaintTrackerInstrumentOptionDescriptors();
     }
 
     public int getTaintedCount() {
