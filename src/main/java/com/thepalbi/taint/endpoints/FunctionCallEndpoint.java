@@ -29,7 +29,7 @@ public abstract class FunctionCallEndpoint extends InputCapturerEventExecutionNo
     }
 
     @Override
-    protected void beforeEvaluation(Object[] inputValues) {
+    protected final void beforeEvaluation(Object[] inputValues) {
         receiver = inputValues[RECEIVER_INPUT_INDEX];
         function = (JSFunctionObject) inputValues[FUNCTION_INPUT_INDEX];
         arguments = takeLastN(inputValues, inputValues.length - 2);
@@ -37,7 +37,7 @@ public abstract class FunctionCallEndpoint extends InputCapturerEventExecutionNo
     }
 
     @Override
-    protected void afterEvaluation(Object[] inputValues, Object result) {
+    protected final void afterEvaluation(Object[] inputValues, Object result) {
         afterCall(receiver, function, arguments, result);
     }
 }

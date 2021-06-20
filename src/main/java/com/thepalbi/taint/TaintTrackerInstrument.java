@@ -41,31 +41,32 @@
 package com.thepalbi.taint;
 
 import com.oracle.truffle.api.Option;
-import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.api.instrumentation.*;
+import com.oracle.truffle.api.instrumentation.Instrumenter;
+import com.oracle.truffle.api.instrumentation.SourceSectionFilter;
+import com.oracle.truffle.api.instrumentation.StandardTags;
 import com.oracle.truffle.api.instrumentation.StandardTags.ExpressionTag;
+import com.oracle.truffle.api.instrumentation.TruffleInstrument;
 import com.oracle.truffle.api.instrumentation.TruffleInstrument.Registration;
-import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.js.nodes.instrumentation.JSTags;
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
-import com.oracle.truffle.js.runtime.objects.Null;
 import com.oracle.truffle.js.runtime.objects.Nullish;
-import com.thepalbi.taint.endpoints.FunctionCallEndpoint;
+import com.thepalbi.taint.endpoints.EntryPointTaintInjectorEndpoint;
 import com.thepalbi.taint.endpoints.KnownSinkEndpoint;
+import com.thepalbi.taint.endpoints.RequireEndpoint;
 import com.thepalbi.taint.endpoints.TestTaintInjectorEndpoint;
 import com.thepalbi.taint.meta.SimpleMetaStore;
 import com.thepalbi.taint.propagators.BinaryOperationPropagator;
 import com.thepalbi.taint.propagators.PropReadPropagator;
-import com.thepalbi.taint.endpoints.RequireEndpoint;
 import com.thepalbi.taint.propagators.UnaryOperationPropagator;
 import org.graalvm.options.*;
 
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Example for simple version of an expression coverage instrument.
@@ -87,6 +88,7 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
 
     private Integer violationCount = 0;
     private SimpleMetaStore metaStore = new SimpleMetaStore(false);
+    private Set<JSFunctionObject> entryPoints = new HashSet<>();
 
     // @formatter:off
     /**
@@ -200,6 +202,12 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
                         KNOWN_SINK_NAME.getValue(env.getOptions())
                 ))));
 
+        instrumenter.attachExecutionEventFactory(
+                SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
+                inputFilter,
+                ctx -> new EntryPointTaintInjectorEndpoint(TaintTrackerInstrument.this));
+
+
         if (IS_TESTING.getValue(env.getOptions())) {
             // Inject taint on return values of specific func, and log taint value of arguments
             instrumenter.attachExecutionEventFactory(
@@ -250,5 +258,13 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
 
     public Integer getViolationCount() {
         return violationCount;
+    }
+
+    public void registerEntryPoint(JSFunctionObject func) {
+        entryPoints.add(func);
+    }
+
+    public boolean isEntryPoint(JSFunctionObject func) {
+        return entryPoints.contains(func);
     }
 }
