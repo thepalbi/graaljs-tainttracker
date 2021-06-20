@@ -55,6 +55,7 @@ import com.oracle.truffle.js.runtime.objects.Null;
 import com.oracle.truffle.js.runtime.objects.Nullish;
 import com.thepalbi.taint.endpoints.FunctionCallEndpoint;
 import com.thepalbi.taint.endpoints.KnownSinkEndpoint;
+import com.thepalbi.taint.endpoints.TestTaintInjectorEndpoint;
 import com.thepalbi.taint.meta.SimpleMetaStore;
 import com.thepalbi.taint.propagators.BinaryOperationPropagator;
 import com.thepalbi.taint.propagators.PropReadPropagator;
@@ -204,31 +205,7 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
             instrumenter.attachExecutionEventFactory(
                     SourceSectionFilter.newBuilder().tagIs(JSTags.FunctionCallTag.class).build(),
                     inputFilter,
-                    ctx -> new FunctionCallEndpoint() {
-
-                        private final String callSourceCode = ctx.getInstrumentedSourceSection().getCharacters().toString();
-
-                        @Override
-                        protected void onEnter(VirtualFrame frame) {
-                            trace("Entry in call: %s", callSourceCode);
-                        }
-
-                        @Override
-                        protected void beforeCall(Object receiver, JSFunctionObject function, Object[] arguments) {
-                            for (int i = 0; i < arguments.length; i++) {
-                                trace("Argument %d: Tainted = %s", i, metaStore.retrieve(arguments[i]));
-                            }
-                        }
-
-                        @Override
-                        protected void afterCall(Object receiver, JSFunctionObject function, Object[] arguments, Object result) {
-                            if (callSourceCode.startsWith("createSensitive")) {
-                                // This function result produces taint
-                                trace("Tainting resulting object of type: %s", result.getClass());
-                                TaintTrackerInstrument.this.taint(result);
-                            }
-                        }
-                    });
+                    ctx -> new TestTaintInjectorEndpoint(TaintTrackerInstrument.this, ctx));
         }
     }
 
