@@ -28,17 +28,14 @@ public class RequireEndpoint extends FunctionCallEndpoint {
         if (isRequire) {
             assert arguments[0] instanceof String;
             String requireString = (String) arguments[0];
-            System.out.printf("%s, %s, %s\n",
-                    sourcePath,
-                    arguments[0],
-                    result.getClass().getName());
             // Just tainting requires whose Path start with lutRootDirectory
             if (requireString.startsWith(".")) {
                 // Make full directory
                 String absoluteRequirePath = Paths.get(sourcePath, requireString).toAbsolutePath().toString();
-                TaintTrackerInstrument.trace("RequireEndpoint - Called require with abolsute path: %s", absoluteRequirePath);
-                if (absoluteRequirePath.startsWith(lutRootDirectory)) {
+                System.out.printf("RequireEndpoint - Called require with absolute path: %s\n", absoluteRequirePath);
+                if (absoluteRequirePath.startsWith(lutRootDirectory) && !absoluteRequirePath.contains("node_modules")) {
                     // TAINT
+                    System.out.printf("RequireEndpoint - Injecting taint\n");
                     instrument.taint(result);
                 }
             }
