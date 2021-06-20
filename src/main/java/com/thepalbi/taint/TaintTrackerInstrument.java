@@ -51,6 +51,8 @@ import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.js.nodes.instrumentation.JSTags;
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
+import com.oracle.truffle.js.runtime.objects.Null;
+import com.oracle.truffle.js.runtime.objects.Nullish;
 import com.thepalbi.taint.endpoints.FunctionCallEndpoint;
 import com.thepalbi.taint.endpoints.KnownSinkEndpoint;
 import com.thepalbi.taint.meta.SimpleMetaStore;
@@ -223,7 +225,7 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
                             if (callSourceCode.startsWith("createSensitive")) {
                                 // This function result produces taint
                                 trace("Tainting resulting object of type: %s", result.getClass());
-                                metaStore.store(result, true);
+                                TaintTrackerInstrument.this.taint(result);
                             }
                         }
                     });
@@ -254,10 +256,14 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
     }
 
     public void taint(Object taintee) {
+        // Both `undefined` and `null` inherit from Nullish
+        if (taintee instanceof Nullish) return;
         metaStore.store(taintee, true);
     }
 
     public boolean isTainted(Object taintee) {
+        // Both `undefined` and `null` inherit from Nullish
+        if (taintee instanceof Nullish) return false;
         return metaStore.retrieve(taintee);
     }
 
