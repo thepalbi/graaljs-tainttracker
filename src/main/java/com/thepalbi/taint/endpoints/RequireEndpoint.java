@@ -3,6 +3,7 @@ package com.thepalbi.taint.endpoints;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.instrumentation.EventContext;
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
+import com.oracle.truffle.js.runtime.objects.JSLazyString;
 import com.thepalbi.taint.TaintTrackerInstrument;
 
 import java.nio.file.Paths;
@@ -26,8 +27,15 @@ public class RequireEndpoint extends FunctionCallEndpoint {
     @Override
     protected void afterCall(Object receiver, JSFunctionObject function, Object[] arguments, Object result) {
         if (isRequire) {
-            assert arguments[0] instanceof String;
-            String requireString = (String) arguments[0];
+            if (arguments.length < 1) {
+                // TODO: This should be a warning
+                TaintTrackerInstrument.trace("require arguments are empty or not of type String. Arguments: %s",
+                        arguments.length > 0 ? arguments[0] : "Empty");
+                return;
+            }
+            // In here I could either cast, or take a toString(). Having seen some other types as first argument of a require,
+            // like String and JSLazyString, opting for the former.
+            String requireString = arguments[0].toString();
             // Just tainting requires whose Path start with lutRootDirectory
             if (requireString.startsWith(".")) {
                 // Make full directory
