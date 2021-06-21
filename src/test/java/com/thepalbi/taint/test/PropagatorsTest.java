@@ -45,7 +45,7 @@ public class PropagatorsTest {
 
     @Test
     public void testPropagationWithExpectedTaintCount() throws IOException {
-        String souceToExplore = readResourceAsString(getClass().getClassLoader().getResourceAsStream(sourceResource));
+        String souceCode = readResourceAsString(getClass().getClassLoader().getResourceAsStream(sourceResource));
         Assume.assumeTrue(Engine.create().getLanguages().containsKey(JS));
         // This is how we can create a context with our tool enabled if we are embeddined in java
         try (Context context = Context.newBuilder(JS)
@@ -53,7 +53,7 @@ public class PropagatorsTest {
                 .option("tainttracker.KnownSinkName", "log")
                 .option("tainttracker.Testing", "true")
                 .build()) {
-            Source source = Source.newBuilder(JS, souceToExplore, "test main").build();
+            Source source = Source.newBuilder(JS, souceCode, "test main").build();
             context.eval(source);
 
             TaintTrackerInstrument instrument = context.getEngine().getInstruments().get(TaintTrackerInstrument.ID).lookup(TaintTrackerInstrument.class);

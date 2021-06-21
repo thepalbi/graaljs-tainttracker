@@ -4,7 +4,6 @@ import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.instrumentation.EventContext;
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
 import com.oracle.truffle.js.runtime.objects.JSDynamicObject;
-import com.oracle.truffle.js.runtime.objects.JSLazyString;
 import com.thepalbi.taint.TaintTrackerInstrument;
 
 import java.nio.file.Paths;
@@ -43,7 +42,8 @@ public class RequireEndpoint extends FunctionCallEndpoint {
             if (requireString.startsWith(".")) {
                 // Make full directory
                 String absoluteRequirePath = Paths.get(sourcePath, requireString).toAbsolutePath().toString();
-                System.out.printf("RequireEndpoint - Called require with absolute path: %s\n", absoluteRequirePath);
+                // TODO: This should be a debug log
+                trace("RequireEndpoint - Called require with absolute path: %s", absoluteRequirePath);
                 if (absoluteRequirePath.startsWith(lutRootDirectory) && !absoluteRequirePath.contains("node_modules")) {
                     // TAINT
                     System.out.printf("RequireEndpoint - Marking as entrypoint\n");
