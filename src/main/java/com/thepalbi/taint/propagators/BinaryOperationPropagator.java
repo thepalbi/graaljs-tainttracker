@@ -24,7 +24,8 @@ public class BinaryOperationPropagator extends InputCapturerEventExecutionNode {
         TaintWithOrigin taint2 = instrument.getTaint(inputValues[1]);
 
         if (taint1.isTainted() || taint2.isTainted()) {
-            instrument.propagateTaint(result, taint1, taint2);
+            // FIXME: Merge taint origins
+            instrument.propagateTaint(result, taint1);
         }
     }
 }
