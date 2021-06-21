@@ -47,7 +47,7 @@ public class RequireEndpoint extends FunctionCallEndpoint {
                 if (absoluteRequirePath.startsWith(lutRootDirectory) && !absoluteRequirePath.contains("node_modules")) {
                     // TAINT
                     System.out.printf("RequireEndpoint - Marking as entrypoint\n");
-                    markEntrypoints(result, true);
+                    markEntrypoints(result, true, null);
                 }
             }
         }
@@ -59,7 +59,7 @@ public class RequireEndpoint extends FunctionCallEndpoint {
      * @param result          the object to mark as entrypoint, if it is one.
      * @param cameFromRequire is true iif result came directly from a `require(sth)` statement.
      */
-    private void markEntrypoints(Object result, boolean cameFromRequire) {
+    private void markEntrypoints(Object result, boolean cameFromRequire, Object keyInContainer) {
         // The result object of the require could come from the following patterns:
         // 1) `module.exports = function(...`: Need just to mark this object as entrypoint
         // 2) `module.exports.doSth = function(...`: In this case, the return should be an object, needing to mark it's members
@@ -68,13 +68,18 @@ public class RequireEndpoint extends FunctionCallEndpoint {
         if (result instanceof JSFunctionObject) {
             // Pattern # 1
             JSFunctionObject entryFunc = (JSFunctionObject) result;
-            instrument.registerEntryPoint(entryFunc);
+            String actualKey = keyInContainer != null ?
+                    keyInContainer.toString() : "null";
+            trace("Pattern 1: Marking function object! funcName=[%s] cameFromRequire=[%s] keyInContainer=[%s]",
+                    entryFunc.getFunctionData().getName(), cameFromRequire, actualKey);
+            instrument.registerEntryPoint(entryFunc, actualKey);
         } else if (cameFromRequire && result instanceof JSDynamicObject) {
             // Pattern # 2
+            trace("Pattern 2: Marking members!");
             JSDynamicObject containerOfEntries = (JSDynamicObject) result;
             for (Object key : containerOfEntries.ownPropertyKeys()) {
                 Object possiblyAnEntryPoint = containerOfEntries.getOwnProperty(key).getValue();
-                markEntrypoints(possiblyAnEntryPoint, false);
+                markEntrypoints(possiblyAnEntryPoint, false, key);
             }
         } else {
             trace("Ignoring entrypoint of type: %s", result.getClass());

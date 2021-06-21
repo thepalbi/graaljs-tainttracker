@@ -87,7 +87,7 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
 
     private List<TaintWithOrigin> offendingTaints = new LinkedList<>();
     private SimpleMetaStore<TaintWithOrigin> metaStore = new SimpleMetaStore(TaintWithOrigin.NoTaint.getInstance());
-    private Set<JSFunctionObject> entryPoints = new HashSet<>();
+    private Map<JSFunctionObject, String> entryPoints = new HashMap<>();
 
     // @formatter:off
     /**
@@ -277,11 +277,11 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
         return offendingTaints.size();
     }
 
-    public void registerEntryPoint(JSFunctionObject func) {
-        entryPoints.add(func);
+    public void registerEntryPoint(JSFunctionObject func, String name) {
+        entryPoints.put(func, name);
     }
 
-    public boolean isEntryPoint(JSFunctionObject func) {
-        return entryPoints.contains(func);
+    public String getEntryPointNameOrNull(JSFunctionObject func) {
+        return entryPoints.get(func);
     }
 }
