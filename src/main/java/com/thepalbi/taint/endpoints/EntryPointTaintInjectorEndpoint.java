@@ -15,7 +15,7 @@ public class EntryPointTaintInjectorEndpoint extends FunctionCallEndpoint {
         if (instrument.isEntryPoint(function)) {
             // Taint all arguments entering the module under test
             for (Object arg : arguments) {
-                instrument.taint(arg);
+                instrument.taint(arg, function.getFunctionData().getName());
             }
             System.out.printf("Tainted %d objects, entering through %s\n", arguments.length, function.getFunctionData().getName());
         }

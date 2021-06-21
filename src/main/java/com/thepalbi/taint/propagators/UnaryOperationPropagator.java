@@ -2,6 +2,7 @@ package com.thepalbi.taint.propagators;
 
 import com.thepalbi.taint.InputCapturerEventExecutionNode;
 import com.thepalbi.taint.TaintTrackerInstrument;
+import com.thepalbi.taint.model.TaintWithOrigin;
 
 public class UnaryOperationPropagator extends InputCapturerEventExecutionNode {
 
@@ -19,8 +20,9 @@ public class UnaryOperationPropagator extends InputCapturerEventExecutionNode {
     @Override
     protected void afterEvaluation(Object[] inputValues, Object result) {
         assert inputValues.length == 1;
-        if (instrument.isTainted(inputValues[0])) {
-            instrument.taint(result);
+        TaintWithOrigin taint = instrument.getTaint(inputValues[0]);
+        if (taint.isTainted()) {
+            instrument.propagateTaint(result, taint);
         }
     }
 }

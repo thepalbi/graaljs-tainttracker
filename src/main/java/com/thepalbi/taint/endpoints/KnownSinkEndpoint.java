@@ -6,6 +6,8 @@ import com.thepalbi.taint.TaintTrackerInstrument;
 import java.util.Arrays;
 import java.util.Set;
 
+import static java.util.Arrays.asList;
+
 public class KnownSinkEndpoint extends FunctionCallEndpoint {
     private final Set<String> knownSinkNames;
     private final TaintTrackerInstrument instrument;
@@ -18,10 +20,10 @@ public class KnownSinkEndpoint extends FunctionCallEndpoint {
     @Override
     protected void beforeCall(Object receiver, JSFunctionObject function, Object[] arguments) {
         if (knownSinkNames.contains(function.getFunctionData().getName())) {
-            boolean anArgumentIsTainted = Arrays.asList(arguments).stream()
-                    .map(arg -> instrument.isTainted(arg))
-                    .anyMatch(b -> b);
-            if (anArgumentIsTainted) instrument.registerViolation();
+            asList(arguments).stream()
+                    .map(arg -> instrument.getTaint(arg))
+                    .filter(b -> b.isTainted())
+                    .forEach(offendingTaint -> instrument.registerOffense(offendingTaint));
         }
     }
 }

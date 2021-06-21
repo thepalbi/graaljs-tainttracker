@@ -58,15 +58,14 @@ import com.thepalbi.taint.endpoints.KnownSinkEndpoint;
 import com.thepalbi.taint.endpoints.RequireEndpoint;
 import com.thepalbi.taint.endpoints.TestTaintInjectorEndpoint;
 import com.thepalbi.taint.meta.SimpleMetaStore;
+import com.thepalbi.taint.model.TaintWithOrigin;
 import com.thepalbi.taint.propagators.BinaryOperationPropagator;
 import com.thepalbi.taint.propagators.PropReadPropagator;
 import com.thepalbi.taint.propagators.UnaryOperationPropagator;
 import org.graalvm.options.*;
 
 import java.io.PrintStream;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Example for simple version of an expression coverage instrument.
@@ -86,8 +85,8 @@ import java.util.Set;
 @Registration(id = TaintTrackerInstrument.ID, name = "Simple Taint Tracker", version = "0.1", services = TaintTrackerInstrument.class)
 public final class TaintTrackerInstrument extends TruffleInstrument {
 
-    private Integer violationCount = 0;
-    private SimpleMetaStore metaStore = new SimpleMetaStore(false);
+    private List<TaintWithOrigin> offendingTaints = new LinkedList<>();
+    private SimpleMetaStore<TaintWithOrigin> metaStore = new SimpleMetaStore(TaintWithOrigin.NoTaint.getInstance());
     private Set<JSFunctionObject> entryPoints = new HashSet<>();
 
     // @formatter:off
@@ -219,7 +218,14 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
 
     @Override
     protected void onDispose(Env env) {
-        System.out.printf("Disposing instrment. Seen %d total violations!\n", violationCount);
+        System.out.printf("Disposing instrument. Results!\n");
+        System.out.printf("Total offenses count: %d\n", offendingTaints.size());
+        offendingTaints.stream().forEach(offense -> {
+                    System.out.printf("Offense\n", offendingTaints.size());
+                    offense.getOrigins().stream().forEach(origin ->
+                            System.out.printf("Origin: %s\n", origin));
+                }
+        );
     }
 
     /**
@@ -240,24 +246,35 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
         return metaStore.getTaintedCount();
     }
 
-    public void taint(Object taintee) {
+    public void taint(Object taintee, String origin) {
         // Both `undefined` and `null` inherit from Nullish
         if (taintee instanceof Nullish) return;
-        metaStore.store(taintee, true);
+        metaStore.store(taintee, new TaintWithOrigin(origin));
     }
 
-    public boolean isTainted(Object taintee) {
+    public void propagateTaint(Object taintee, TaintWithOrigin... taints) {
         // Both `undefined` and `null` inherit from Nullish
-        if (taintee instanceof Nullish) return false;
+        if (taintee instanceof Nullish) return;
+        if (taints.length == 1) {
+            metaStore.store(taintee, taints[0]);
+        } else {
+            TaintWithOrigin mergedTaints = Arrays.stream(taints).reduce(TaintWithOrigin.NoTaint.getInstance(), TaintWithOrigin::merge);
+            metaStore.store(taintee, mergedTaints);
+        }
+    }
+
+    public TaintWithOrigin getTaint(Object taintee) {
+        // Both `undefined` and `null` inherit from Nullish
+        if (taintee instanceof Nullish) return TaintWithOrigin.NoTaint.getInstance();
         return metaStore.retrieve(taintee);
     }
 
-    public void registerViolation() {
-        violationCount++;
+    public void registerOffense(TaintWithOrigin taint) {
+        offendingTaints.add(taint);
     }
 
     public Integer getViolationCount() {
-        return violationCount;
+        return offendingTaints.size();
     }
 
     public void registerEntryPoint(JSFunctionObject func) {

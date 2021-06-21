@@ -6,6 +6,7 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.js.runtime.builtins.JSGlobalObject;
 import com.thepalbi.taint.InputCapturerEventExecutionNode;
 import com.thepalbi.taint.TaintTrackerInstrument;
+import com.thepalbi.taint.model.TaintWithOrigin;
 
 import static com.thepalbi.taint.TaintTrackerInstrument.trace;
 
@@ -44,15 +45,18 @@ public class PropReadPropagator extends InputCapturerEventExecutionNode {
 
     @Override
     protected void afterEvaluation(Object[] inputValues, Object result) {
-        // TODO: Discover how to find property name being read
         // inputValues[0] is the base of the prop read AST node
         assert inputValues.length == 1;
 
         Object base = inputValues[0];
 
-        // Avoiding global.sth prop reads
-        if (!(base instanceof JSGlobalObject) && instrument.isTainted(base)) {
-            instrument.taint(result);
+        // If base[member] is already tainted, just return
+        TaintWithOrigin resultTaint = instrument.getTaint(result);
+        if (resultTaint.isTainted()) return;
+
+        // If base is tainted, propagate to base[member], iif base == global in JS
+        if (!(base instanceof JSGlobalObject) && instrument.getTaint(base).isTainted()) {
+            instrument.propagateTaint(result, instrument.getTaint(base));
         }
     }
 }
