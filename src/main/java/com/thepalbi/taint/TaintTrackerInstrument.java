@@ -277,6 +277,12 @@ public final class TaintTrackerInstrument extends TruffleInstrument {
         return offendingTaints.size();
     }
 
+    public Set<String> getViolationOrigins() {
+        Set<String> collectedOrigins = new HashSet<>();
+        offendingTaints.stream().forEach(two -> collectedOrigins.addAll(two.getOrigins()));
+        return collectedOrigins;
+    }
+
     public void registerEntryPoint(JSFunctionObject func, String name) {
         entryPoints.put(func, name);
     }

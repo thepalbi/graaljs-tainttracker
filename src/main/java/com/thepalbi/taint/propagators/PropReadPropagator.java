@@ -54,7 +54,7 @@ public class PropReadPropagator extends InputCapturerEventExecutionNode {
         TaintWithOrigin resultTaint = instrument.getTaint(result);
         if (resultTaint.isTainted()) return;
 
-        // If base is tainted, propagate to base[member], iif base == global in JS
+        // If base is tainted, propagate to base[member], iif base != global in JS
         if (!(base instanceof JSGlobalObject) && instrument.getTaint(base).isTainted()) {
             instrument.propagateTaint(result, instrument.getTaint(base));
         }

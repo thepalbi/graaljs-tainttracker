@@ -3,9 +3,9 @@ package com.thepalbi.taint.endpoints;
 import com.oracle.truffle.js.runtime.builtins.JSFunctionObject;
 import com.thepalbi.taint.TaintTrackerInstrument;
 
-import java.util.Arrays;
 import java.util.Set;
 
+import static com.thepalbi.taint.TaintTrackerInstrument.trace;
 import static java.util.Arrays.asList;
 
 public class KnownSinkEndpoint extends FunctionCallEndpoint {
@@ -19,7 +19,10 @@ public class KnownSinkEndpoint extends FunctionCallEndpoint {
 
     @Override
     protected void beforeCall(Object receiver, JSFunctionObject function, Object[] arguments) {
-        if (knownSinkNames.contains(function.getFunctionData().getName())) {
+        // Maybe the function being called doesn't have a name argument. Use the function object itself to detect if it's a known sink, somehow!
+        String functionName = function.getFunctionData().getName();
+        if (knownSinkNames.contains(functionName)) {
+            trace("Reached %s known sink. Evaluating if any argument is tainted!", functionName);
             asList(arguments).stream()
                     .map(arg -> instrument.getTaint(arg))
                     .filter(b -> b.isTainted())
