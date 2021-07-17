@@ -41,7 +41,8 @@ public class RequireToKnownSinkPropagationTest {
         return asList(
                 new Object[]{"e2e/simple.js", 1, "simple propagation", asList("entry")},
                 new Object[]{"e2e/compound.js", 2, "simple propagation with compound return", asList("entryFunc", "entryFunc2")},
-                new Object[]{"e2e/with-wrapper-obj.js", 1, "propagation across wrapped object", asList("entryFunc")}
+                new Object[]{"e2e/with-wrapper-obj.js", 1, "propagation across wrapped object", asList("entryFunc")},
+                new Object[]{"e2e/simple-and-wrapped.js", 2, "propagation with simple and wrapped object", asList("wrappedEntryFunc", "simpleEntryFunc")}
         );
     }
 
